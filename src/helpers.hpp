@@ -69,6 +69,12 @@ public:
 				}),
 			in.end());
 	}
+	static std::string toString(char* arr){
+		std::string ret = "";
+		for(size_t i = 0 ; i < strlen(arr); i++)
+			ret += arr[i];
+		return ret;
+	}
 	static char* toCharArray(std::string str) {
 		char* retCharArr = new char[str.length() + 1];
 		for (size_t i = 0; i <= str.length(); i++)

@@ -127,15 +127,14 @@ public:
 		inet_ntop(AF_INET, &(TCPClientAddr.sin_addr.s_addr), ipAddr, INET_ADDRSTRLEN);
 #endif
 		std::cout << "[*] Accepted Connection from " << ipAddr << ":" << TCPClientAddr.sin_port << std::endl;
+		Helpers::divider();
 		std::string banner = Helpers::getBanner(ipAddr);
 		int bannerLen = banner.length();
 		banner.insert(0, Helpers::getDivider(bannerLen));
 		banner += Helpers::getDivider(bannerLen);
-		banner += Helpers::getShell();
 		send(sAcceptSocket, banner.c_str(), banner.length(), 0);
 
-
-		iRecv = recv(sAcceptSocket, recvBuffer, 4096, 0);
+		iRecv = recv(sAcceptSocket, recvBuffer, BUFFER_LENGTH, 0);
 		if (iRecv == SOCKET_ERROR) {
 			std::cout << "[!] Unable to receive data.\n";
 #ifdef _WIN32
@@ -144,9 +143,15 @@ public:
 #endif
 			return false;
 		}
-		std::string senderBuffer = Helpers::executeCommand(recvBuffer) + '\n';
-		int iSenderBuffer = strlen(senderBuffer.c_str()) + 1;
-		iSend = send(sAcceptSocket, senderBuffer.c_str(), iSenderBuffer, 0);
+		if (Helpers::toString(recvBuffer) == "invoke-shell"){
+			std::string senderBuffer = Helpers::getShell();
+			std::cout << senderBuffer << std::endl;
+			int iSenderBuffer = strlen(senderBuffer.c_str()) + 1;
+			iSend = send(sAcceptSocket, senderBuffer.c_str(), iSenderBuffer, 0);
+		}
+		// std::string senderBuffer = Helpers::executeCommand(recvBuffer) + '\n';
+		// int iSenderBuffer = strlen(senderBuffer.c_str()) + 1;
+		// iSend = send(sAcceptSocket, senderBuffer.c_str(), iSenderBuffer, 0);
 		if (iSend == SOCKET_ERROR) {
 			std::cout << "[!] Unable to send data.\n";
 #ifdef _WIN32
