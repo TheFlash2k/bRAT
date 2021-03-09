@@ -1,6 +1,5 @@
 #pragma once
 #include <iostream>
-#include <string.h>
 #include <algorithm>
 #include <fstream>
 
@@ -8,11 +7,13 @@
 
 #ifdef _WIN32
 #define timeSleep 10000
+#include <string>
 #endif
 
 // Some important macros that really needed to be defined in linux idk im newb ;-;
 #ifdef __linux__
 #include <unistd.h>
+#include <string.h>
 
 #define SOCKET int // This is used so that we don't have to change the return type of getSocket() xDDDD
 #define _popen popen
@@ -180,7 +181,9 @@ public:
 		arr[std::remove_if(arr, arr + len, [](char c) { return c == '\n'; }) - arr] = 0;
 		return arr;
 	}
+	#ifdef __linux__
 	static bool isRoot(){
 		return geteuid() == 0;
 	}
+	#endif
 };
