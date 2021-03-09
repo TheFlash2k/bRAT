@@ -6,7 +6,7 @@
 #include <WS2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 #define timeSleep 10000
-#define clear system("cls");
+#define __clear__ system("cls");
 #endif
 
 #ifdef __linux__
@@ -14,7 +14,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #define IPPROTO_TCP 0
-#define clear system("clear");
+#define __clear__ system("clear");
 #endif
 
 class Attacker {
@@ -81,7 +81,7 @@ class Attacker {
         return uChoice;
     }
 public:
-    Attacker(std::string ipAddr = "127.0.0.1", int port = 6969) : ipAddr(ipAddr), port(port), clientSock(INVALID_SOCKET)
+    Attacker(std::string ipAddr = "127.0.0.1", int port = 8080) : ipAddr(ipAddr), port(port), clientSock(INVALID_SOCKET)
     { }
 
     void setPort(int port) { this->port = port; }
@@ -306,7 +306,7 @@ int main() {
     int port;
     // ip = "192.168.0.101";
     ip = "127.0.0.1";
-    port = 6969;
+    port = 8080;
 
     while (true) {
         connect(ip, port);
@@ -315,6 +315,6 @@ int main() {
         if(attacker->establishConnection())
             attacker->getBanner();
         Sleep(timeSleep);
-       clear
+       __clear__;
     }
 }
