@@ -6,14 +6,15 @@
 #define BUFFER_LENGTH 4096
 
 #ifdef _WIN32
-#define timeSleep 10000
 #include <string>
+#include <shlobj_core.h>
+#define timeSleep 10000
 #endif
 
 // Some important macros that really needed to be defined in linux idk im newb ;-;
 #ifdef __linux__
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 
 #define SOCKET int // This is used so that we don't have to change the return type of getSocket() xDDDD
 #define _popen popen
@@ -28,7 +29,7 @@
 
 // A Static class
 class Helpers {
-	Helpers(){} // Preventing the creation of an object.
+	Helpers() {} // Preventing the creation of an object.
 public:
 	static void divider(int size = 50) {
 		for (int i = 0; i < size; i++) {
@@ -36,18 +37,18 @@ public:
 		}
 		std::cout << std::endl;
 	}
-	static std::string readFromFile(const std::string& file_name){
+	static std::string readFromFile(const std::string& file_name) {
 		std::string cmd = "rm -r " + file_name;
 		std::string temp;
 		std::string ret;
 		std::ifstream fHandle(file_name.c_str());
-		if(!fHandle.good())
+		if (!fHandle.good())
 			return "";
-		if(!fHandle){
+		if (!fHandle) {
 			std::cout << "Unable to read from file!\n";
 			return "";
 		}
-		while(std::getline(fHandle, temp)){
+		while (std::getline(fHandle, temp)) {
 			ret += temp + "\n";
 		}
 		return ret;
@@ -59,6 +60,13 @@ public:
 		divider += "\n";
 		return divider;
 	}
+	static bool hasSpaces(std::string str) {
+		for (size_t i = 0; i < str.length(); i++) {
+			if (str[i] == ' ')
+				return true;
+		}
+		return false;
+	}
 	static std::string executeCommand(const char command[]) {
 		/*
 			I implemented a method to firstly call the subprocess and simply send the output back
@@ -68,39 +76,39 @@ public:
 		int status;
 		const int PATH_MAX = 4096;
 		char path[PATH_MAX] = { 0 };
-		std::string out; // This will contain the value to be returned.
-
+		std::string out;
 		std::string temp;
 		const char* rmCMD = "rm ";
 		std::string logName = "brat.log";
 		std::string remove = rmCMD;
 
-		#ifdef _WIN32
+#ifdef _WIN32
 		temp = "%temp%\\";
-		#endif
-		#ifdef __linux__
+#endif
+#ifdef __linux__
 		temp = "/tmp/";
-		#endif
-		logName.insert(0, temp);
+#endif
 		remove += logName;
-		std::string cmd = command;
-		cmd.insert(0, "(");
-		cmd += ") 1> " + logName + " 2>&1";
+		std::string cmd = "( ";
+		cmd += command;
+		cmd += " ) 1> " + logName + " 2>&1";
 		command = cmd.c_str();
+		std::cout << "CMD: " << command << std::endl;
 		fp = _popen(command, "r");
 		if (fp == NULL) {
 			std::cout << "Unable to execute command!\n";
 			return "";
 		}
-		while (fgets(path, PATH_MAX, fp) != NULL){}
+		while (fgets(path, PATH_MAX, fp) != NULL) {}
 		out = readFromFile(logName);
+		std::cout << "Out: " << out << std::endl;
 		if (fp == NULL)
 			return "";
 		status = _pclose(fp);
 		if (status == -1) {
 			std::cout << "Unable to close\n";
 		}
-		system(remove.c_str());
+		//system(remove.c_str());
 		return out;
 	}
 	static void removeDisallowed(std::string& in) {
@@ -111,9 +119,9 @@ public:
 				}),
 			in.end());
 	}
-	static std::string toString(char* arr){
+	static std::string toString(char* arr) {
 		std::string ret = "";
-		for(size_t i = 0 ; i < strlen(arr); i++)
+		for (size_t i = 0; i < strlen(arr); i++)
 			ret += arr[i];
 		return ret;
 	}
@@ -126,12 +134,12 @@ public:
 		return retCharArr;
 	}
 	static std::string getMacAddress() {
-		#ifdef __linux__
-			char cmd[] = "cat /sys/class/net/eth0/address";
-		#endif
-		#ifdef _WIN32
-			char cmd[] ="powershell.exe -c \"Get-NetAdapter | Select-Object MacAddress -ExpandProperty MacAddress | Select-Object -first 1\"";
-		#endif
+#ifdef __linux__
+		char cmd[] = "cat /sys/class/net/eth0/address";
+#endif
+#ifdef _WIN32
+		char cmd[] = "powershell.exe -c \"Get-NetAdapter | Select-Object MacAddress -ExpandProperty MacAddress | Select-Object -first 1\"";
+#endif
 		return removeNewline(executeCommand(cmd).c_str());
 	}
 	static std::string getBanner(const char* ipAddress = "0.0.0.0") {
@@ -164,11 +172,11 @@ public:
 #endif
 		return shell;
 	}
-	static std::string getPowerShellPrompt(){
-		#ifdef _WIN32
+	static std::string getPowerShellPrompt() {
+#ifdef _WIN32
 		std::string shell = "PS " + removeNewline(executeCommand("cd").c_str()) + " > ";
 		return shell;
-		#endif
+#endif
 		return "";
 	}
 	static std::string removeNewline(const char* ar) {
@@ -181,9 +189,13 @@ public:
 		arr[std::remove_if(arr, arr + len, [](char c) { return c == '\n'; }) - arr] = 0;
 		return arr;
 	}
-	#ifdef __linux__
-	static bool isRoot(){
+	static bool isRoot() {
+#ifdef __linux__
 		return geteuid() == 0;
+#endif
+#ifdef _WIN32
+		return IsUserAnAdmin();
+#endif 
+
 	}
-	#endif
 };

@@ -1,10 +1,5 @@
 #pragma once
-#ifdef __linux__
 #include <string.h>
-#endif
-#ifdef _WIN32
-#include <string>
-#endif
 #include <iostream>
 #include <tuple>
 #include <cctype> // Contains the std::isspace method;
