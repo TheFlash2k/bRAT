@@ -196,6 +196,5 @@ public:
 #ifdef _WIN32
 		return IsUserAnAdmin();
 #endif 
-
 	}
 };

